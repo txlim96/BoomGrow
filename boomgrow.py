@@ -1,23 +1,25 @@
 import RPi.GPIO as gpio
 from time import sleep
 from motion import *
+from retrieve_reading import *
+import VL53L0X
 import sys
 
 # version
-RELEASE = False
+RELEASE = True
 
 # pinout definitions
-M_FB_DIR    = 13
-M_FB_PUL    = 21
-M_FB_EN     = 10
-
-M_TL_DIR    = 15
-M_TL_PUL    = 23
+M_TL_DIR    = 8
+M_TL_PUL    = 10
 M_TL_EN     = 12
 
-M_TR_DIR    = 11
-M_TR_PUL    = 19
-M_TR_EN     = 8
+M_FB_DIR    = 11
+M_FB_PUL    = 13
+M_FB_EN     = 15
+
+M_TR_DIR    = 19
+M_TR_PUL    = 21
+M_TR_EN     = 23
 
 SW_FB       = 24
 SW_TL       = 22
@@ -63,16 +65,26 @@ try:
         main()
         pinSetup(PIN)
         if RELEASE:
-            test = 5
+            sensorObject = retrieve_reading(VL53L0X.VL53L0X())
+            moveFB(1.0)
+            sleep(1)
+            moveTele(sensorObject)
+            sleep(1)
+            moveFB(-1.0)
+            sensorObject.close()
         else:
             mode = sys.argv[1]
             if mode.upper() == "AUTO":
+                sensorObject = retrieve_reading(VL53L0X.VL53L0X())
                 travel_dist = float(raw_input("Travelling distance: "))
                 moveFB(travel_dist)
                 sleep(1)
-                moveTele()
+                moveTele(sensorObject)
                 sleep(1)
                 moveFB(-travel_dist)
+                sensorObject.close()
+            elif mode.upper() == "HOME":
+                home()
             elif mode.upper() == "MANUAL":
                 if sys.argv[2].upper() == "FB":
                     while True:
@@ -80,7 +92,7 @@ try:
                         moveFB(travel_dist)
                 elif sys.argv[2].upper() == "ARM":
                     moveTele()
-                    
+
 except KeyboardInterrupt:
     print("Disabled")
 except ValueError:

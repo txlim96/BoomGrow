@@ -1,6 +1,16 @@
 import RPi.GPIO as gpio
 from time import sleep
-from math import pi
+from math import pi, floor
+import paho.mqtt.client as mqtt
+from picamera import PiCamera
+import json
+#from retrieve_reading import readData
+
+# mqtt constants
+MQTT_HOST = "test.mosquitto.org"
+MQTT_PORT = 1883
+MQTT_TIMEOUT = 60
+MQTT_TOPIC = "AC"
 
 # stepper motor constants
 DELAY         = 0.00005
@@ -13,8 +23,13 @@ RADIUS_TELE = 12
 DPR_FB      = 0.002*pi*RADIUS_FB
 DPR_TELE    = 0.002*pi*RADIUS_TELE
 
+# trigger
+TRIGGER_LENGTH = 5
+TRIGGER_STEP = floor(TRIGGER_LENGTH/DPR_TELE*MICROSTEPPING)
+
 # telescopic constants
 TELE_LENGTH = 0.76
+CAM_POSITION = [0.07,0.14,0.14,0.14,0.14]
 
 step_fb   = 0
 step_tele = 0
@@ -47,11 +62,19 @@ def limit(channel):
     global limit_sw
     limit_sw = channel
 
-def motor(pulse, duration):
-    gpio.output(pulse, True)
-    sleep(duration)
-    gpio.output(pulse, False)
-    sleep(duration)
+def motor(pulse1, pulse2, duration):
+    if pulse2 == 0:
+        gpio.output(pulse1, True)
+        sleep(duration)
+        gpio.output(pulse1, False)
+        sleep(duration)
+    else:
+        gpio.output(pulse1, True)
+        gpio.output(pulse2, True)
+        sleep(duration)
+        gpio.output(pulse1, False)
+        gpio.output(pulse2, False)
+        sleep(duration)
     return 1
 
 def calibrate(pins):
@@ -66,12 +89,12 @@ def accelerate(pins, mode, steps_to_max=200, acc_steps=10): # steps_to_max must 
     if mode == "a":
         for repeat in range(acc_steps,0,-1):
             for iteration in range(steps_to_max/acc_steps):
-                motor(pins, DELAY*repeat)
+                motor(pins, 0, DELAY*repeat)
         return steps_to_max
     elif mode == "d":
         for repeat in range(1,acc_steps,1):
             for iteration in range(steps_to_max/acc_steps):
-                motor(pins, DELAY*repeat)
+                motor(pins, 0, DELAY*repeat)
         return steps_to_max
 
 def pinSetup(pins):
@@ -106,27 +129,58 @@ def moveFB(disp=1.0):
         if step_fb < TOTAL_STEPS:
             step_fb += accelerate(PIN["FB"]["A"]["PUL"], "a")
         elif TOTAL_STEPS <= step_fb and step_fb < ul:
-            step_fb += motor(PIN["FB"]["A"]["PUL"], DELAY)
+            step_fb += motor(PIN["FB"]["A"]["PUL"], 0, DELAY)
         else:
             step_fb += accelerate(PIN["FB"]["A"]["PUL"], "d")
             
     gpio.output(PIN["FB"]["A"]["EN"], False)
     
-def moveTele():
+def moveTele(sensor):
     global step_tele
     step_tele = 0
     extension_sequence = [False, True]
+#    camera = PiCamera()
     
+    client = mqtt.Client()
+    client.on_connect = on_connect
+    client.on_message = on_message
+
+    client.connect(MQTT_HOST, MQTT_PORT, MQTT_TIMEOUT)
+    client.loop_start()
+
     gpio.output(PIN["TELESCOPE"]["L"]["EN"], True)
     gpio.output(PIN["TELESCOPE"]["R"]["EN"], True)
     
+    pos = 0
     for i in range(2):
         step_tele = 0
         gpio.output(PIN["TELESCOPE"]["L"]["DIR"], extension_sequence[i])
         gpio.output(PIN["TELESCOPE"]["R"]["DIR"], extension_sequence[i])
         while step_tele <= TELE_LENGTH / DPR_TELE * MICROSTEPPING:
-            step_tele += motor(PIN["TELESCOPE"]["L"]["PUL"], DELAY)
-            motor(PIN["TELESCOPE"]["R"]["PUL"], DELAY)
-    
+            step_tele += motor(PIN["TELESCOPE"]["L"]["PUL"],PIN["TELESCOPE"]["R"]["PUL"],DELAY)
+#            if (step_tele == CAM_POSITION[pos]/DPR_TELE*MICROSTEPPING):
+#                camera.capture('/home/pi/Desktop/boomgrow/images/'+pos+'.jpg')
+#                pos += 1
+#                sleep(2)
+            if (step_tele % 2122 == 0 and i == 0):
+#                height = 5
+                height = sensor.readData()
+                x = 5
+                z = step_tele*DPR_TELE/MICROSTEPPING
+                msg = json.dumps({"name":"arm1", "height":height, "x":x, "z":z})
+                client.publish(MQTT_TOPIC, msg)
+
     gpio.output(PIN["TELESCOPE"]["L"]["EN"], False)
     gpio.output(PIN["TELESCOPE"]["R"]["EN"], False)
+    client.loop_stop()
+
+def on_connect(client, userdata, flags, rc):
+    print("Connected with result code "+str(rc))
+    client.subscribe(MQTT_TOPIC)
+
+def on_message(client, userdata, msg):
+    payload = json.loads(msg.payload)
+#    print(payload["height"])
+#    print(payload["name"])
+#    print("Name: {0}".format(payload["name"]))
+    print("Height: {0}".format(payload["height"]))
