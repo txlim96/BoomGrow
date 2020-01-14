@@ -4,6 +4,7 @@ from motion import *
 from retrieve_reading import *
 import VL53L0X
 import sys
+import os
 
 # version
 RELEASE = True
@@ -22,8 +23,8 @@ M_TR_PUL    = 21
 M_TR_EN     = 23
 
 SW_FB       = 24
-SW_TL       = 22
-SW_TR       = 26
+SW_TL       = 26
+SW_TR       = 22
 
 PIN = {
     "FB": {
@@ -62,6 +63,8 @@ def main():
 
 try:
     if __name__ == "__main__":
+#        os.killall("motioneye")
+#        os.killall("motion")
         main()
         pinSetup(PIN)
         if RELEASE:
