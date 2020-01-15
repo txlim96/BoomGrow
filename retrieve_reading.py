@@ -11,8 +11,11 @@ class retrieve_reading():
             self.timing = 20000
 
     def readData(self):
+        dist = 8191
         dist = self.tof.get_distance()
-        print(dist)
+#        while dist > 5000:
+#            dist = self.tof.get_distance()
+#         print(dist)
         sleep(self.timing/1000000000.00)
         return dist
 

@@ -55,6 +55,7 @@ PIN = {
     }
 
 trigger = False
+currPos = 0
 
 def main():
     gpio.setmode(gpio.BOARD)
@@ -67,14 +68,16 @@ def main():
                     gpio.setup(PIN[mode][direction][pinout], gpio.OUT)
 
 def auto(dist):
+    global currPos
     main()
     pinSetup(PIN)
     sensorObject = retrieve_reading(VL53L0X.VL53L0X())
-    moveFB(dist)
+    moveFB(currPos,dist)
     sleep(1)
-    moveTele(sensorObject)
+    moveTele(dist,sensorObject)
     sleep(1)
-    moveFB(-dist)
+    currPos = dist
+#    moveFB(-dist)
     gpio.cleanup()
 
 def home():

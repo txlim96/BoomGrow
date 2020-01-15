@@ -119,13 +119,19 @@ def pinSetup(pins):
 #    for sequence in calibrate_sequence:
 #        calibrate(sequence)
 
-def moveFB(disp=1.0):
+def moveFB(currentPosition, disp=1.0):
     global step_fb
     step_fb = 0
-    total = abs(disp) / DPR_FB * MICROSTEPPING
+    total = abs(disp-currentPosition) / DPR_FB * MICROSTEPPING
+#    total = abs(disp) / DPR_FB * MICROSTEPPING
     ul = total-TOTAL_STEPS
 
-    gpio.output(PIN["FB"]["A"]["DIR"], disp<0)
+#    print("{0} {1}".format(currentPosition, disp))
+    if currentPosition < disp:
+        gpio.output(PIN["FB"]["A"]["DIR"], disp<0)
+    else:
+        gpio.output(PIN["FB"]["A"]["DIR"], disp>0)
+
     gpio.output(PIN["FB"]["A"]["EN"], True)
     while step_fb < total:
         if step_fb < TOTAL_STEPS:
@@ -137,7 +143,7 @@ def moveFB(disp=1.0):
 
     gpio.output(PIN["FB"]["A"]["EN"], False)
 
-def moveTele(sensor):
+def moveTele(dist, sensor):
     global step_tele
     step_tele = 0
     extension_sequence = [False, True]
@@ -160,13 +166,14 @@ def moveTele(sensor):
         gpio.output(PIN["TELESCOPE"]["R"]["DIR"], extension_sequence[i])
         while step_tele <= TELE_LENGTH / DPR_TELE * MICROSTEPPING:
             step_tele += motor(PIN["TELESCOPE"]["L"]["PUL"],PIN["TELESCOPE"]["R"]["PUL"],DELAY*5)
- #           if (pos < 5 and step_tele == CAM_POSITION[pos] and i == 0):
- #               camera.capture('/home/pi/Desktop/boomgrow/images/%s.jpg'%pos)
- #               pos += 1
- #               sleep(2)
+            if (pos < 5 and step_tele == CAM_POSITION[pos] and i == 0):
+#                camera.capture('/var/www/html/images/%s.jpg'%pos)
+                pos += 1
+                sleep(2)
             if (step_tele % 212 == 0 and i == 0):
-                height = sensor.readData()
-                x = 5
+#                height = sensor.readData()
+                height = 5
+                x = dist
                 z = ceil(step_tele*DPR_TELE/MICROSTEPPING*2000)
                 msg = json.dumps({"name":"arm1", "height":height, "x":x, "z":z})
                 client.publish(MQTT_TOPIC_PUBLISH, msg)
