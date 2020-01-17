@@ -114,11 +114,6 @@ def pinSetup(pins):
     gpio.output(PIN["TELESCOPE"]["L"]["EN"], False)
     gpio.output(PIN["TELESCOPE"]["R"]["EN"], False)
 
-#    calibrate_sequence = [PIN["TELESCOPE"]["L"], PIN["TELESCOPE"]["R"], PIN["FB"]["A"]]
-
-#    for sequence in calibrate_sequence:
-#        calibrate(sequence)
-
 def moveFB(currentPosition, disp=1.0):
     global step_fb
     step_fb = 0
