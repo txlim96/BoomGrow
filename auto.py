@@ -77,12 +77,15 @@ def auto(dist):
     moveTele(dist,sensorObject)
     sleep(1)
     currPos = dist
-#    moveFB(-dist)
     gpio.cleanup()
 
 def home():
     main()
     pinSetup(PIN)
+    calibrate_sequence = [PIN["TELESCOPE"]["L"], PIN["TELESCOPE"]["R"], PIN["FB"]["A"]]
+
+    for sequence in calibate_sequence:
+        calibrate(sequence)
     gpio.cleanup()
 
 def on_connect(client, userdata, flags, rc):
@@ -97,7 +100,6 @@ def on_message(client, userdata, msg):
             home()
         elif 0 < payload["position"] and payload["position"] < 5:
             d = 3*2*payload["position"]+149.13*(2*payload["position"]-1)+149.13/2
-#            print(d/1000)
             auto(d/1000)
 
 try:
