@@ -4,6 +4,7 @@ from math import pi, ceil, floor
 import paho.mqtt.client as mqtt
 from picamera import PiCamera
 import json
+import random
 #from retrieve_reading import readData
 
 # mqtt constants
@@ -29,8 +30,8 @@ TRIGGER_LENGTH = 0.25
 TRIGGER_STEP = floor(TRIGGER_LENGTH/DPR_TELE*MICROSTEPPING)
 
 # telescopic constants
-TELE_LENGTH = 0.34
-CAM_POSITION = [2971,8913,14854,20796,26738]
+TELE_LENGTH = 0.35
+CAM_POSITION = [6035,11706,17377,23048,28719]
 
 limit_sw  = 0
 step_fb   = 0
@@ -122,23 +123,24 @@ def moveFB(currentPosition, disp=1.0):
     ul = total-TOTAL_STEPS
 
 #    print("{0} {1}".format(currentPosition, disp))
-    if currentPosition < disp:
-        gpio.output(PIN["FB"]["A"]["DIR"], disp<0)
-    else:
-        gpio.output(PIN["FB"]["A"]["DIR"], disp>0)
-
-    gpio.output(PIN["FB"]["A"]["EN"], True)
-    while step_fb < total:
-        if step_fb < TOTAL_STEPS:
-            step_fb += accelerate(PIN["FB"]["A"]["PUL"], "a")
-        elif TOTAL_STEPS <= step_fb and step_fb < ul:
-            step_fb += motor(PIN["FB"]["A"]["PUL"], 0, DELAY)
+    if currentPosition != disp:
+        if currentPosition < disp:
+            gpio.output(PIN["FB"]["A"]["DIR"], disp<0)
         else:
-            step_fb += accelerate(PIN["FB"]["A"]["PUL"], "d")
+            gpio.output(PIN["FB"]["A"]["DIR"], disp>0)
+
+        gpio.output(PIN["FB"]["A"]["EN"], True)
+        while step_fb < total:
+            if step_fb < TOTAL_STEPS:
+                step_fb += accelerate(PIN["FB"]["A"]["PUL"], "a")
+            elif TOTAL_STEPS <= step_fb and step_fb < ul:
+                step_fb += motor(PIN["FB"]["A"]["PUL"], 0, DELAY)
+            else:
+                step_fb += accelerate(PIN["FB"]["A"]["PUL"], "d")
 
     gpio.output(PIN["FB"]["A"]["EN"], False)
 
-def moveTele(dist, sensor):
+def moveTele(dist):
     global step_tele
     step_tele = 0
     extension_sequence = [False, True]
@@ -161,17 +163,25 @@ def moveTele(dist, sensor):
         gpio.output(PIN["TELESCOPE"]["R"]["DIR"], extension_sequence[i])
         while step_tele <= TELE_LENGTH / DPR_TELE * MICROSTEPPING:
             step_tele += motor(PIN["TELESCOPE"]["L"]["PUL"],PIN["TELESCOPE"]["R"]["PUL"],DELAY*5)
-            if (pos < 5 and step_tele == CAM_POSITION[pos] and i == 0):
-#                camera.capture('/var/www/html/images/%s.jpg'%pos)
-                pos += 1
-                sleep(2)
-            if (step_tele % 212 == 0 and i == 0):
-#                height = sensor.readData()
-                height = 5
-                x = dist
-                z = ceil(step_tele*DPR_TELE/MICROSTEPPING*2000)
-                msg = json.dumps({"name":"arm1", "height":height, "x":x, "z":z})
-                client.publish(MQTT_TOPIC_PUBLISH, msg)
+            if i == 0:
+                if (pos < 5 and step_tele == CAM_POSITION[pos]):
+                    try:
+                        camera = PiCamera()
+                        camera.capture('/var/www/html/images/%s.jpg'%pos)
+                        pos += 1
+                        sleep(3)
+                        camera.close()
+                    except:
+                        PiCamera().close()
+                if (step_tele % 212 == 0):
+                    if CAM_POSITION[pos]-1000 < step_tele and step_tele > CAM_POSITION[pos]+1000:
+                        height = random.randint(10, 50)
+                    else:
+                        height = random.randint(60, 75)
+                    x = dist
+                    z = ceil(step_tele*DPR_TELE/MICROSTEPPING*2000)
+                    msg = json.dumps({"name":"arm1", "height":height, "x":x, "z":z})
+                    client.publish(MQTT_TOPIC_PUBLISH, msg)
 
     gpio.output(PIN["TELESCOPE"]["L"]["EN"], False)
     gpio.output(PIN["TELESCOPE"]["R"]["EN"], False)
