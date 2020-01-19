@@ -71,12 +71,11 @@ def auto(dist):
     global currPos
     main()
     pinSetup(PIN)
-    sensorObject = retrieve_reading(VL53L0X.VL53L0X())
+#    sensorObject = retrieve_reading(VL53L0X.VL53L0X())
     moveFB(currPos,dist)
     sleep(1)
-    moveTele(dist,sensorObject)
+    currPos = moveTele(dist)
     sleep(1)
-    currPos = dist
     gpio.cleanup()
 
 def home():
@@ -98,9 +97,11 @@ def on_message(client, userdata, msg):
     if payload["name"] == "arm1":
         if payload["position"] == 0:
             home()
-        elif 0 < payload["position"] and payload["position"] < 5:
+        elif payload["position"] == 1:
             d = 3*2*payload["position"]+149.13*(2*payload["position"]-1)+149.13/2
-            auto(d/1000)
+            auto(1.38)
+        elif payload["position"] == 2:
+            auto(1.68)
 
 try:
     client = mqtt.Client()
